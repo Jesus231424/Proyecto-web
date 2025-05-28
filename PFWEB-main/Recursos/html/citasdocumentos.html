@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSalud - Mis Documentos de Citas Médicas</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../css/main.css">
+    <link rel="stylesheet" href="../css/navbar.css">
+
+    <style>
+        body {
+            /* font-family: Arial, sans-serif; No es necesario, Montserrat se hereda de main.css */
+            /* margin: 0; padding: 0; background-color: #a4a2a2; color: #333; main.css maneja el padding-top y SSalud usa #a4a2a2 como --color-background */
+            background-color: var(--color-background, #a4a2a2); /* Usar variable CSS o fallback */
+            color: var(--color-text-primary, #333);
+        }
+        /* Se elimina la clase .header-bar original, ya que se reemplaza por el menú estándar */
+        .container {
+            max-width: 900px;
+            margin: 30px auto;
+            background-color: #fff; /* Considerar var(--color-surface) si es el blanco estándar para tarjetas */
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 0 12px rgba(0,0,0,0.1);
+        }
+        .page-title-custom { /* Nueva clase para el título que estaba en header-bar */
+            text-align: center;
+            font-size: 1.8em;
+            color: var(--color-primary, #6C63FF); /* Usar color primario del tema */
+            margin-bottom: 25px;
+            margin-top: 10px; /* Espacio después del navbar fijo */
+        }
+        .user-info {
+            text-align: right;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+            color: #555;
+        }
+        .appointment-card {
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 20px;
+            background-color: #f9f9f9;
+            transition: box-shadow 0.3s ease;
+        }
+        .appointment-card:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .appointment-card h3 {
+            margin-top: 0;
+            color: #007bff;
+            font-size: 1.4em;
+            margin-bottom: 15px;
+        }
+        .appointment-card p {
+            margin-bottom: 8px;
+            line-height: 1.6;
+        }
+        .download-pdf-btn {
+            background-color: #28a745;
+            color: white;
+            padding: 12px 18px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background-color 0.3s ease;
+        }
+        .download-pdf-btn:hover {
+            background-color: #218838;
+        }
+        .alert-message {
+            padding: 15px;
+            margin-bottom: 20px;
+            border: 1px solid transparent;
+            border-radius: 4px;
+        }
+        .alert-login {
+            color: #721c24;
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            text-align: center;
+        }
+        .alert-login a {
+            color: #721c24;
+            font-weight: bold;
+            text-decoration: underline;
+        }
+        .no-appointments {
+            text-align: center;
+            font-style: italic;
+            color: #666;
+            padding: 20px;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+    <script defer src="../js/mobile.js"></script>
+</head>
+<body>
+
+    <header class="topheader">
+        <nav class="topnav">
+            <a href="main.html" class="logo">
+                <img height="50" width="50" src="/sec/img/heart.png" alt="pagina principal" />
+                <div>SSalud</div>
+            </a>
+            <button class="open-menu" aria-label="Abrir menú">
+                <img src="/sec/cvg/hamburger-icon.svg" alt="abrir menú" />
+            </button>
+            <ul class="menu">
+                <button class="close-menu" aria-label="Cerrar menú">
+                    <img src="/sec/cvg/close-icon.svg" alt="cerrar menú" />
+                </button>
+                <li><a href="main.html" class="selected">Inicio</a></li>
+                <li><a href="dashboard.html" class="privado">Citas</a></li>
+                <li><a href="servicios.html">Servicios</a></li>
+                <li><a href="especialistas.html">Especialistas</a></li>
+                <li><a href="contactos.html">Contactos</a></li>
+                <li><a href="localidades.html">Ubicación</a></li>
+                <li><a href="login.html">Cuenta</a></li>
+                <li class="privado" id="liNavLogout" style="display:none;"><button id="navLogout" style="background: var(--color-secondary); color:white; padding: 5px 10px; border:none; border-radius:5px; cursor:pointer; font-family: 'Montserrat', sans-serif; font-size: 16px; text-transform: uppercase;">Cerrar Sesión</button></li>
+            </ul>
+        </nav>
+    </header>
+
+    <div class="container">
+        <h1 id="pageTitle" class="page-title-custom">Mis Documentos de Citas</h1> <div id="userInfo" class="user-info"></div>
+        <div id="appointmentsContainer">
+            </div>
+    </div>
+
+    <script>
+        // Lógica de autenticación y actualización del menú
+        const isLoggedIn = sessionStorage.getItem('isLoggedIn') === 'true';
+        const userType = sessionStorage.getItem('userType');
+        // const userId = sessionStorage.getItem('userId'); // Ya está en el script de abajo
+        // const userName = sessionStorage.getItem('userName'); // Ya está en el script de abajo
+
+        function updateNav() {
+            const navLogin = document.getElementById('navLogin');
+            const liNavLogout = document.getElementById('liNavLogout'); // El LI que contiene el botón de logout
+            const navLogout = document.getElementById('navLogout');
+
+            document.querySelectorAll('.menu .nav-link.privado, .menu li.privado').forEach(element => {
+                if (!isLoggedIn) {
+                    element.style.display = 'none';
+                } else {
+                    // Muestra el elemento (puede ser <a> o <li>)
+                    if (element.tagName === 'A') {
+                        element.parentElement.style.display = 'list-item'; // Mostrar el <li> padre
+                    } else { // Si es el <li> del logout
+                         element.style.display = 'list-item';
+                    }
+
+                    // Ocultar según tipo de usuario
+                    if (element.classList.contains('paciente-only') && userType !== 'paciente') {
+                        if (element.tagName === 'A') element.parentElement.style.display = 'none';
+                        else element.style.display = 'none';
+                    }
+                    if (element.classList.contains('doctor-only') && userType !== 'doctor') {
+                        if (element.tagName === 'A') element.parentElement.style.display = 'none';
+                        else element.style.display = 'none';
+                    }
+                }
+            });
+
+            if (navLogin) { // El enlace <a> de "Cuenta"
+                 if (navLogin.parentElement.tagName === 'LI') {
+                    navLogin.parentElement.style.display = isLoggedIn ? 'none' : 'list-item';
+                } else {
+                    navLogin.style.display = isLoggedIn ? 'none' : 'block'; // o 'inline-block'
+                }
+            }
+            if (liNavLogout && navLogout) { // El <li> y el <button> de "Cerrar Sesión"
+                liNavLogout.style.display = isLoggedIn ? 'list-item' : 'none';
+                navLogout.addEventListener('click', function() {
+                    sessionStorage.clear(); // Limpia toda la sesión
+                    window.location.href = 'login.html';
+                });
+            }
+             // Marcar el enlace actual como 'selected'
+            document.querySelectorAll('.menu a.nav-link').forEach(link => {
+                link.classList.remove('selected');
+                if (link.getAttribute('href') === 'citasdocumentos.html') { // Nombre de esta página
+                    link.classList.add('selected');
+                }
+            });
+        }
+
+        // Datos de citas y funciones PDF (código original de la página de documentos)
+        const allAppointmentsData = [
+            {
+                id: "cita001",
+                fecha: "2024-05-15",
+                paciente: { nombre: "Ana Martínez", id: "P001" },
+                estatura: 165,
+                presionArterial: "120/80",
+                tipoDeSangre: "A+",
+                condicionesMedicas: [
+                    { condicion: "Hipertensión", estado: "Controlada" },
+                    { condicion: "Migraña Crónica", estado: "En tratamiento" }
+                ],
+                descripcionConsulta: "Paciente acude a control rutinario de hipertensión. Refiere sentirse bien.",
+                medicamentosRecetados: [
+                    { nombre: "Losartán", dosis: "50mg", frecuencia: "1 vez al día", duracion: "Permanente" }
+                ]
+            },
+            {
+                id: "cita002",
+                fecha: "2024-05-20",
+                paciente: { nombre: "Carlos López", id: "P002" },
+                estatura: 178,
+                presionArterial: "130/85",
+                tipoDeSangre: "O-",
+                condicionesMedicas: [
+                    { condicion: "Hipertensión", estado: "Leve, inicio de tratamiento" },
+                    { condicion: "Asma", estado: "Controlada con inhalador" }
+                ],
+                descripcionConsulta: "Primera consulta por detección de presión arterial ligeramente elevada.",
+                medicamentosRecetados: [
+                    { nombre: "Enalapril", dosis: "10mg", frecuencia: "1 vez al día", duracion: "3 meses (reevaluar)" }
+                ]
+            },
+            {
+                id: "cita003",
+                fecha: "2024-06-01",
+                paciente: { nombre: "Ana Martínez", id: "P001" },
+                estatura: 165,
+                presionArterial: "118/78",
+                tipoDeSangre: "A+",
+                condicionesMedicas: [
+                    { condicion: "Hipertensión", estado: "Estable" },
+                    { condicion: "Migraña Crónica", estado: "Mejoría con nuevo tratamiento" }
+                ],
+                descripcionConsulta: "Seguimiento de migraña y control de HTA. Paciente reporta disminución en frecuencia de cefaleas.",
+                medicamentosRecetados: [
+                    { nombre: "Losartán", dosis: "50mg", frecuencia: "1 vez al día", duracion: "Permanente" },
+                    { nombre: "Sumatriptán", dosis: "50mg", frecuencia: "Al inicio de migraña", duracion: "Según necesidad" }
+                ]
+            }
+        ];
+
+        function generateAppointmentPDF(appointment) {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            doc.setFontSize(18);
+            doc.text("Detalle de Cita Médica", 105, 22, null, null, "center");
+
+            doc.setFontSize(12);
+            doc.text(`Fecha de Cita: ${appointment.fecha}`, 14, 35);
+            doc.text(`Paciente: ${appointment.paciente.nombre}`, 14, 42);
+            doc.text(`ID Paciente: ${appointment.paciente.id}`, 14, 49);
+            
+            let currentY = 60;
+
+            doc.setFontSize(14);
+            doc.setFont(undefined, 'bold');
+            doc.text("1. Datos Verificados en la Cita", 14, currentY);
+            currentY += 8;
+            doc.setFontSize(11);
+            doc.setFont(undefined, 'normal');
+            doc.text(`- Estatura: ${appointment.estatura} cm`, 18, currentY); currentY += 7;
+            doc.text(`- Presión Arterial: ${appointment.presionArterial} mmHg`, 18, currentY); currentY += 7;
+            doc.text(`- Tipo de Sangre: ${appointment.tipoDeSangre}`, 18, currentY); currentY += 10;
+
+            doc.setFontSize(14);
+            doc.setFont(undefined, 'bold');
+            doc.text("2. Condiciones Médicas", 14, currentY);
+            currentY += 2; 
+            const conditionsTableBody = appointment.condicionesMedicas.map(cond => [cond.condicion, cond.estado]);
+            doc.autoTable({
+                startY: currentY,
+                head: [['Condición', 'Estado']],
+                body: conditionsTableBody,
+                theme: 'grid',
+                headStyles: { fillColor: [40, 167, 69] }, 
+                margin: { left: 14, right: 14 }
+            });
+            currentY = doc.previousAutoTable.finalY + 10;
+
+            doc.setFontSize(14);
+            doc.setFont(undefined, 'bold');
+            doc.text("3. Descripción de la Consulta", 14, currentY);
+            currentY += 8;
+            doc.setFontSize(11);
+            doc.setFont(undefined, 'normal');
+            const consultText = doc.splitTextToSize(appointment.descripcionConsulta, doc.internal.pageSize.getWidth() - 28);
+            doc.text(consultText, 14, currentY);
+            currentY += (consultText.length * 5) + 5; 
+
+            if (currentY > 250) { doc.addPage(); currentY = 20; } 
+
+            doc.setFontSize(14);
+            doc.setFont(undefined, 'bold');
+            doc.text("4. Medicamentos Recetados", 14, currentY);
+            currentY += 2; 
+            const medsTableBody = appointment.medicamentosRecetados.map(med => [med.nombre, med.dosis, med.frecuencia, med.duracion]);
+            doc.autoTable({
+                startY: currentY,
+                head: [['Medicamento', 'Dosis', 'Frecuencia', 'Duración']],
+                body: medsTableBody,
+                theme: 'grid',
+                headStyles: { fillColor: [40, 167, 69] },
+                margin: { left: 14, right: 14 }
+            });
+            currentY = doc.previousAutoTable.finalY + 10;
+
+            doc.setFontSize(9);
+            doc.setTextColor(150);
+            const pageCount = doc.internal.getNumberOfPages();
+            for (let i = 1; i <= pageCount; i++) {
+                doc.setPage(i);
+                doc.text(`Página ${i} de ${pageCount}`, doc.internal.pageSize.getWidth() / 2, 285, { align: 'center' });
+                doc.text(`Documento generado el: ${new Date().toLocaleDateString()}`, 14, 285);
+            }
+            
+            doc.save(`Detalle_Cita_${appointment.paciente.nombre.replace(/\s+/g, '_')}_${appointment.fecha}.pdf`);
+        }
+
+        function displayUserAppointments(appointmentsToDisplay, patientName, patientId) { // Renombré userName a patientName para claridad
+            const container = document.getElementById('appointmentsContainer');
+            const userInfoDiv = document.getElementById('userInfo');
+            const pageTitleH1 = document.querySelector('.page-title-custom'); // Seleccionar por la nueva clase
+
+            pageTitleH1.textContent = `Documentos de Citas de ${patientName}`;
+            userInfoDiv.textContent = `Usuario: ${patientName} (ID: ${patientId})`;
+
+
+            if (!appointmentsToDisplay || appointmentsToDisplay.length === 0) {
+                container.innerHTML = `<p class="no-appointments">No tiene documentos de citas disponibles, ${patientName}.</p>`;
+                return;
+            }
+
+            container.innerHTML = ''; 
+            appointmentsToDisplay.forEach(app => {
+                const card = document.createElement('div');
+                card.className = 'appointment-card';
+                card.innerHTML = `
+                    <h3>Cita del ${app.fecha}</h3>
+                    <p><strong>Paciente:</strong> ${app.paciente.nombre}</p>
+                    <p><strong>Presión Arterial:</strong> ${app.presionArterial}</p>
+                    <p><strong>Resumen Consulta:</strong> ${app.descripcionConsulta.substring(0, 120)}...</p>
+                    <button class="download-pdf-btn" data-appointment-id="${app.id}">Descargar PDF de la Cita</button>
+                `;
+                container.appendChild(card);
+
+                const button = card.querySelector('.download-pdf-btn');
+                button.addEventListener('click', () => {
+                    const appointmentDetails = allAppointmentsData.find(fullApp => fullApp.id === app.id && fullApp.paciente.id === patientId);
+                    if (appointmentDetails) {
+                        generateAppointmentPDF(appointmentDetails);
+                    } else {
+                        console.error('Could not find appointment details for ID:', app.id, 'and user ID:', patientId);
+                        alert('Error: No se encontraron los detalles completos de la cita.');
+                    }
+                });
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            updateNav(); // Llamar para configurar el menú
+            
+            const currentIsLoggedIn = sessionStorage.getItem('isLoggedIn') === 'true'; // Re-evaluar por si acaso
+            const currentUserId = sessionStorage.getItem('userId'); 
+            
+            const appointmentsDiv = document.getElementById('appointmentsContainer'); // Renombré container a appointmentsDiv para evitar confusión
+            const pageTitleH1 = document.querySelector('.page-title-custom');
+
+
+            if (!currentIsLoggedIn || !currentUserId) {
+                pageTitleH1.textContent = 'Acceso Restringido';
+                appointmentsDiv.innerHTML = 
+                    `<div class="alert-message alert-login">
+                        Debe iniciar sesión para ver sus documentos de citas. <br>
+                        <a href="login.html">Ir a Iniciar Sesión</a>
+                     </div>`; 
+                document.getElementById('userInfo').style.display = 'none';
+                return;
+            }
+
+            // Simulación de obtención de datos (reemplazar con fetch real)
+            // Los datos de `allAppointmentsData` son globales en este script.
+            // En una aplicación real, aquí harías fetch al backend para obtener las citas
+            // y luego los datos del paciente (nombre) si no vienen con las citas.
+
+            const userAppointments = allAppointmentsData.filter(app => app.paciente.id === currentUserId);
+            
+            const patientData = allAppointmentsData.find(app => app.paciente.id === currentUserId);
+            const currentUserName = patientData ? patientData.paciente.nombre : (sessionStorage.getItem('userName') || "Usuario Desconocido"); // Usar sessionStorage como fallback
+            
+            displayUserAppointments(userAppointments, currentUserName, currentUserId);
+        });
+
+    </script>
+
+</body>
+</html>
